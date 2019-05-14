@@ -64,13 +64,11 @@ bool parseJson(JsonDocument *doc, char buff[]) {
 
 /// Handles a json document according to its content
 void handleJson(JsonDocument doc) {
-    if (strcmp(doc["c"], "x") == 0) {
+    if (strcmp(doc["c"], "xy") == 0) {
       // Check led state in command
       DMXSerial.write(1, doc["x"]);     // 0 = rechts - 255 = links
-    } else if (strcmp(doc["c"], "y") == 0) {
-      // Check led state in command
-      DMXSerial.write(1, doc["y"]);
-    } 
+      DMXSerial.write(2, doc["y"]);
+    }
 }
 
 /// Main loop
