@@ -1,8 +1,7 @@
-#include <ArduinoJson.h>
 #include <DMXSerial.h>
 
 #define BAUD 115200
-#define JSON_BUFFER 200
+#define BLE_BUFFER_SIZE 20
 
 /// Setup
 void setup() {
@@ -19,21 +18,26 @@ void setup() {
   DMXSerial.write(8, 0);
 }
 
-// Json buffer
-char json[JSON_BUFFER] = {0};
-// Json counter
-int jsonCounter = 0;
+// Buffer
+char buff[BLE_BUFFER_SIZE] = {0};
+// Counter
+int buffCounter = 0;
 // Flag for flagging finished reading
-bool readJson = false;
+bool readBuff = false;
 
-/// Frees the json buffer and resets the flag
-void freeJson() {
-  for (int i = 0; i < jsonCounter; i++) {
-    json[i] = 0;
+struct ControlXYCommand {
+  int x;
+  int y;
+};
+
+/// Frees the buffer and resets the flag
+void freeBuffer() {
+  for (int i = 0; i < buffCounter; i++) {
+    buff[i] = 0;
   }
 
-  jsonCounter = 0;
-  readJson = false;
+  buffCounter = 0;
+  readBuff = false;
 }
 
 /// Reads from the serial input if available
@@ -42,33 +46,60 @@ void readSerial() {
     // Get single char from HM-10
     char c = Serial3.read();
     // Activate flag if line feed found
-    readJson = c == '\n';
+    readBuff = c == '\n';
     // Add char to buffer
-    json[jsonCounter] = c;
-    jsonCounter++;
+    buff[buffCounter] = c;
+    buffCounter++;
   }
 }
 
-bool parseJson(JsonDocument *doc, char buff[]) {
-    // Deserialize the JSON document
-    DeserializationError error = deserializeJson(*doc, buff);
-    
-    // Test if parsing succeeds and reset buffer if failed
-    if (error) {
-      freeJson();
-      return false;
-    } else {
-      return true;
+/// Parses the buffer into a command struct
+struct ControlXYCommand parseBuffer(char buff[], int buffSize) {
+  ControlXYCommand command = { 0, 0 };
+
+  // Buffer for temp values
+  char tmp[buffSize] = {0};
+  int tmpCounter = 0;
+
+  // Iterate through buffer
+  for (int i = 0; i < buffSize; i++) {
+    // If x found, reset tmp buffer
+    if (buff[i] == 'x') {
+      for (int i = 0; i < tmpCounter; i++) {
+        tmp[i] = 0;
+      }
+      tmpCounter = 0;
     }
+    // If y found, set buffered x, and reset tmp buffer 
+    else if (buff[i] == 'y') {
+      command.x = atoi(tmp);
+      for (int i = 0; i < tmpCounter; i++) {
+        tmp[i] = 0;
+      }
+      tmpCounter = 0;
+    }
+    // If line feed found, set buffered y, and reset tmp buffer 
+    else if (buff[i] == '\n') {
+      command.y = atoi(tmp);
+      for (int i = 0; i < tmpCounter; i++) {
+        tmp[i] = 0;
+      }
+      tmpCounter = 0;
+    }
+    // If nothing special found, fill tmp buffer
+    else if ((buff[i] != 'x') && (buff[i] != 'y')) {
+      tmp[tmpCounter] = buff[i];
+      tmpCounter++;
+    }
+  }
+  
+  return command;
 }
 
-/// Handles a json document according to its content
-void handleJson(JsonDocument doc) {
-    if (strcmp(doc["c"], "xy") == 0) {
-      // Check led state in command
-      DMXSerial.write(1, doc["x"]);     // 0 = rechts - 255 = links
-      DMXSerial.write(2, doc["y"]);
-    }
+/// Handles a control xy command and controls the DMX
+void handleCommand(ControlXYCommand command) {  
+  DMXSerial.write(1, command.x);
+  DMXSerial.write(2, command.y);
 }
 
 /// Main loop
@@ -77,17 +108,12 @@ void loop() {
   readSerial();
 
   // If reading finished
-  if (readJson) {
-    // Parse json
-    StaticJsonDocument<JSON_BUFFER> doc;
-    bool success = parseJson(&doc, json);
-
-    // Handle doc if success
-    if (success) {
-      handleJson(doc);
-    }
+  if (readBuff) {
+    // Parse buffer into command struct
+    ControlXYCommand command = parseBuffer(buff, buffCounter);
+    handleCommand(command);
 
     // Free buffer
-    freeJson();
+    freeBuffer();
   }
 }
