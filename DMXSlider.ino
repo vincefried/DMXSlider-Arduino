@@ -10,8 +10,8 @@ void setup() {
 
   // Initialize DMX Controller
   DMXSerial.init(DMXController);
-  DMXSerial.write(3, 45);    //Color
-  DMXSerial.write(4, 8);     //Gobo /muster
+  DMXSerial.write(3, 90);    //Color
+  DMXSerial.write(4, 43);     //Gobo /muster
   DMXSerial.write(5, 8);     //Shutter Strobe
   DMXSerial.write(6, 255);   
   DMXSerial.write(7, 0);
