@@ -22,8 +22,6 @@ void setup() {
 char buff[BLE_BUFFER_SIZE] = {0};
 // Counter
 int buffCounter = 0;
-// Flag for flagging finished reading
-bool readBuff = false;
 
 struct ControlXYCommand {
   int x;
@@ -37,20 +35,21 @@ void freeBuffer() {
   }
 
   buffCounter = 0;
-  readBuff = false;
 }
 
 /// Reads from the serial input if available
-void readSerial() {
+bool readSerial() {
   if (Serial3.available()) {
     // Get single char from HM-10
     char c = Serial3.read();
     // Activate flag if line feed found
-    readBuff = c == '\n';
     // Add char to buffer
     buff[buffCounter] = c;
     buffCounter++;
+    return c == '\n';
   }
+
+  return false;
 }
 
 /// Parses the buffer into a command struct
@@ -103,12 +102,9 @@ void handleCommand(ControlXYCommand command) {
 }
 
 /// Main loop
-void loop() {
-  // Read input from HM-10 if available
-  readSerial();
-
+void loop() {  
   // If reading finished
-  if (readBuff) {
+  if (readSerial()) {
     // Parse buffer into command struct
     ControlXYCommand command = parseBuffer(buff, buffCounter);
     handleCommand(command);
